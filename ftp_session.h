@@ -11,8 +11,8 @@
 #define DATA_PORT     0
 #define DATA_PASSIVE  1
 
-/* space required for text representation of address and port, 
-   e.g. "192.168.0.1 port 1024" or 
+/* space required for text representation of address and port,
+   e.g. "192.168.0.1 port 1024" or
         "2001:3333:DEAD:BEEF:0666:0013:0069:0042 port 65535" */
 #define ADDRPORT_STRLEN 58
 
@@ -31,10 +31,6 @@ typedef struct {
   /* offset to begin sending file from */
   off_t file_offset;
   unsigned long file_offset_command_number;
-
-  /* flag set if client requests ESPV ALL - this prevents subsequent 
-   * use of PORT, PASV, LPRT, LPSV, or EPRT */
-  int epsv_all_set;
 
   /* address of client */
   struct sockaddr_in client_addr;
@@ -62,6 +58,7 @@ int FtpSessionInit(FtpSession *f, const struct sockaddr_in *client_addr,
                    TelnetSession *t, const char *dir);
 void FtpSessionDrop(FtpSession *f, const char *reason);
 void FtpSessionRun(FtpSession *f);
+void FtpSessionReply(FtpSession *f, int code, const char *fmt, ...);
 void FtpSessionDestroy(FtpSession *f);
 
 #endif /* FTP_SESSION_H */

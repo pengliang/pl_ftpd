@@ -21,24 +21,26 @@ struct {
   char *name;
   void (*func)(FtpSession *f, const FtpCommand *cmd);
 } command_func[] = {
-  { "user", DoUser },
-  { "pass", DoPass },
-  { "cwd",  DoCwd },
-  { "cdup", DoCdup },
-  { "quit", DoQuit },
-  { "port", DoPort },
-  { "type", DoType },
-  { "stru", DoStru },
-  { "mode", DoMode },
-  { "retr", DoRetr },
-  { "stor", DoStor },
-  { "noop", DoNoop },
+  { "user", DoUser  },
+  { "pass", DoPass  },
+  { "cwd",  DoCwd   },
+  { "cdup", DoCdup  },
+  { "pwd",  DoPwd   },
+  { "list", DoList  },
+  { "nlst", DoNlst  },
+  { "quit", DoQuit  },
+  { "port", DoPort  },
+  { "type", DoType  },
+  { "stru", DoStru  },
+  { "mode", DoMode  },
+  { "retr", DoRetr  },
+  { "stor", DoStor  },
+  { "noop", DoNoop  },
 };
 
 static const int kCommandFuncNum = sizeof(command_func) / sizeof(command_func[0]);
 
 static void GetAddrStr(const struct sockaddr_in *s, char *buf, int bufsiz);
-static void Reply(FtpSession *f, int code, const char *fmt, ...);
 static void SendReadme(const FtpSession *f, int code);
 
 int FtpSessionInit(FtpSession *f,
@@ -62,8 +64,6 @@ int FtpSessionInit(FtpSession *f,
   f->file_offset = 0;
   f->file_offset_command_number = ULONG_MAX;
 
-  f->epsv_all_set = 0;
-
   f->client_addr = *client_addr;
   GetAddrStr(client_addr, f->client_addr_str, sizeof(f->client_addr_str));
 
@@ -84,18 +84,40 @@ void FtpSessionDrop(FtpSession *f, const char *reason) {
   assert(reason != NULL);
 
   /* say goodbye */
-  Reply(f, 421, "%s.", reason);
+  FtpSessionReply(f, 421, "%s.", reason);
+}
+
+void FtpSessionReply(FtpSession *f, int code, const char *fmt, ...) {
+  char buf[256];
+  va_list ap;
+
+  assert(code >= 100);
+  assert(code <= 559);
+  assert(fmt != NULL);
+
+  /* prepend our code to the buffer */
+  sprintf(buf, "%d", code);
+  buf[3] = ' ';
+
+  /* add the formatted output of the caller to the buffer */
+  va_start(ap, fmt);
+  vsnprintf(buf + 4, sizeof(buf) - 4, fmt, ap);
+  va_end(ap);
+
+  //syslog(LOG_DEBUG, "%s %s", f->client_addr_str, buf);
+
+  /* send the output to the other side */
+  TelnetPrintLine(f->telnet_session, buf);
 }
 
 void FtpSessionRun(FtpSession *f) {
   char buf[2048];
-  int len;
+  int len = 0, i = 0, cmd_parse_ret = 0;
   FtpCommand cmd;
-  int i;
 
   /* say hello */
   SendReadme(f, 220);
-  Reply(f, 220, "Service ready for new user.");
+  FtpSessionReply(f, 220, "Service ready for new user.");
 
   /* process commands */
   while (f->session_active &&
@@ -110,7 +132,7 @@ void FtpSessionRun(FtpSession *f) {
     /* make sure we read a whole line */
     len = strlen(buf);
     if (buf[len-1] != '\n') {
-      Reply(f, 500, "Command line too long.");
+      FtpSessionReply(f, 500, "Command line too long.");
       while (TelnetReadLine(f->telnet_session, buf, sizeof(buf))) {
         len = strlen(buf);
         if (buf[len-1] == '\n') {
@@ -121,21 +143,25 @@ void FtpSessionRun(FtpSession *f) {
     }
 
     /* parse the line */
-    if (!FtpCommandParse(buf, &cmd)) {
-      Reply(f, 500, "Syntax error, command unrecognized.");
+    if ((cmd_parse_ret = FtpCommandParse(buf, &cmd)) != 0) {
+      if (cmd_parse_ret == COMMAND_PARAMETERS_ERROR) {
+        FtpSessionReply(f, 501, "Syntax error in parameters or arguments of command %s.", buf);
+      } else {
+        FtpSessionReply(f, 500, "Syntax error, command %s unrecognized.", buf);
+      }
       goto next_command;
     }
 
     /* dispatch the command */
     for (i = 0; i < kCommandFuncNum; i++) {
-      if (strcmp(cmd.command, command_func[i].name) == 0) {
+      if (strcasecmp(cmd.command, command_func[i].name) == 0) {
         (command_func[i].func)(f, &cmd);
         goto next_command;
       }
     }
 
     /* oops, we don't have this command (shouldn't happen - shrug) */
-    Reply(f, 502, "Command not implemented.");
+    FtpSessionReply(f, 502, "Command not implemented.");
 
 next_command: {}
   }
@@ -168,29 +194,6 @@ static void GetAddrStr(const struct sockaddr_in *s, char *buf, int bufsiz) {
              (addr >> 8)  & 0xff,
              addr & 0xff,
              port);
-}
-
-static void Reply(FtpSession *f, int code, const char *fmt, ...) {
-  char buf[256];
-  va_list ap;
-
-  assert(code >= 100);
-  assert(code <= 559);
-  assert(fmt != NULL);
-
-  /* prepend our code to the buffer */
-  sprintf(buf, "%d", code);
-  buf[3] = ' ';
-
-  /* add the formatted output of the caller to the buffer */
-  va_start(ap, fmt);
-  vsnprintf(buf + 4, sizeof(buf) - 4, fmt, ap);
-  va_end(ap);
-
-  //syslog(LOG_DEBUG, "%s %s", f->client_addr_str, buf);
-
-  /* send the output to the other side */
-  TelnetPrintLine(f->telnet_session, buf);
 }
 
 static void SendReadme(const FtpSession *f, int code) {

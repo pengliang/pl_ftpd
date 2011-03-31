@@ -8,7 +8,7 @@
 
 typedef struct {
   /* file descriptor incoming connections arrive on */
-  int fd;
+  int sock_fd;
 
   /* maximum number of connections */
   int max_connections;
@@ -19,11 +19,8 @@ typedef struct {
   /* timeout (in seconds) for connections */
   int inactivity_timeout;
 
-  /* mutext to lock changes to this structure */
-  pthread_mutex_t mutex;
-
   /* starting directory */
-  char dir[PATH_MAX+1];
+  char dir[PATH_MAX + 1];
 
   /* boolean defining whether listener is running or not */
   int listener_running;
@@ -36,6 +33,9 @@ typedef struct {
 
   /* end of pipe listening thread waits on */
   int shutdown_request_recv_fd;
+
+  /* mutext to lock changes to this structure */
+  pthread_mutex_t mutex;
 
   /* condition to signal thread requesting shutdown */
   pthread_cond_t shutdown_cond;

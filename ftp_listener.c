@@ -11,6 +11,7 @@
 #include <errno.h>
 
 #include "ftpd.h"
+#include "ftp_log.h"
 #include "ftp_session.h"
 #include "ftp_connection.h"
 #include "telnet_session.h"
@@ -21,7 +22,7 @@ static int SocketSetup(char *address, int port);
 
 /* initialize an FTP listener */
 int FtpListenerInit(FtpListener *f, char *address, int port,
-                  int max_connections, int inactivity_timeout) {
+                    int max_connections, int inactivity_timeout) {
   int sock_fd;
   int pipefds[2];
   char dir[PATH_MAX + 1];
@@ -33,26 +34,26 @@ int FtpListenerInit(FtpListener *f, char *address, int port,
 
   /* Gets current directory */
   if (getcwd(dir, sizeof(dir)) == NULL) {
-    perror("Error: getting current directory;");
+    FtpLog(LOG_ERROR, "error getting current directory;");
     return 0;
   }
 
   /* Sets up socket */
   sock_fd = SocketSetup(address, port);
   if (-1 == sock_fd) {
-    perror("Error: setting up socket;");
+    FtpLog(LOG_ERROR, "error setting up socket;");
     return 0;
   }
 
   /* Creates a pipe to wake up our listening thread */
   if (pipe(pipefds) != 0) {
     close(sock_fd);
-    perror("error creating pipe for internal use;");
+    FtpLog(LOG_ERROR, "error creating pipe for internal use;");
     return 0;
   }
 
   /* Loads the values into the structure */
-  f->fd = sock_fd;
+  f->sock_fd = sock_fd;
   f->max_connections = max_connections;
   f->num_connections = 0;
   f->inactivity_timeout = inactivity_timeout;
@@ -68,13 +69,13 @@ int FtpListenerInit(FtpListener *f, char *address, int port,
   return 1;
 }
 
-/* receive connections */
+/* Ready to accept connections */
 int FtpListenerStart(FtpListener *f) {
   pthread_t thread_id;
 
   if (pthread_create(&thread_id, NULL,
                      (void *(*)(void *))FtpConnectionAcceptor, f)) {
-    perror("unable to create ftp listening thread");
+    FtpLog(LOG_ERROR, "unable to create ftp listening thread");
     return 0;
   }
 
@@ -132,8 +133,8 @@ static int SocketSetup(char *address, int port) {
 
     gai_err = getaddrinfo(address, NULL, &hints, &res);
     if (gai_err != 0) {
-      fprintf(stderr, "Error: parsing server socket address;\n %s\n",
-              gai_strerror(gai_err));
+      FtpLog(LOG_ERROR, "Error: parsing server socket address;\n %s\n",
+             gai_strerror(gai_err));
       return -1;
     }
 
@@ -145,7 +146,7 @@ static int SocketSetup(char *address, int port) {
   /* Checks socket address */
   if (!inet_ntop(sock_addr.sin_family, (void *)(&sock_addr.sin_addr),
                  buf, sizeof(buf))) {
-    perror("Error: converting server address to ASCII");
+    FtpLog(LOG_ERROR, "Error: converting server address to ASCII");
     return -1;
   }
 
@@ -154,7 +155,7 @@ static int SocketSetup(char *address, int port) {
   /* Creates socket */
   sock_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (sock_fd == -1) {
-    perror("Error: creating socket;");
+    FtpLog(LOG_ERROR, "error: creating socket;");
     return -1;
   }
 
@@ -162,20 +163,20 @@ static int SocketSetup(char *address, int port) {
   if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR,
                  (void *)&reuseaddr, sizeof(int)) !=0) {
     close(sock_fd);
-    perror("error setting socket to reuse address;");
+    FtpLog(LOG_ERROR, "error setting socket to reuse address;");
     return -1;
   }
 
   if (bind(sock_fd, (struct sockaddr *)&sock_addr,
            sizeof(struct sockaddr_in)) != 0)  {
     close(sock_fd);
-    perror("error binding address;");
+    FtpLog(LOG_ERROR, "error binding address;");
     return -1;
   }
 
   if (listen(sock_fd, SOMAXCONN) != 0) {
     close(sock_fd);
-    perror("error setting socket to listen;");
+    FtpLog(LOG_ERROR, "error setting socket to listen;");
     return -1;
   }
 
@@ -183,12 +184,12 @@ static int SocketSetup(char *address, int port) {
   flags = fcntl(sock_fd, F_GETFL);
   if (flags == -1) {
     close(sock_fd);
-    perror("error getting flags on socket;");
+    FtpLog(LOG_ERROR, "error getting flags on socket;");
     return -1;
   }
   if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) != 0) {
     close(sock_fd);
-    perror("error setting socket to non-blocking;");
+    FtpLog(LOG_ERROR, "error setting socket to non-blocking;");
     return -1;
   }
 

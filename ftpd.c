@@ -7,6 +7,7 @@
 #include <signal.h>
 
 #include "ftp_listener.h"
+#include "ftp_log.h"
 
 static const char *exe_name = "ftpd";
 
@@ -34,10 +35,8 @@ int main(int argc, char *argv[]) {
   /* Gets user's args */
   if (GetOptions(argc, argv, &port, &address,
                  &max_clients, &user_name, &dir_path) == 0) {
-    perror("ftp option parse error.");
+    FtpLog(LOG_ERROR, "ftp option parse error.");
   }
-
-  printf("ftp option parse success.\n");
 
   /* Checks the required parameters */
   if (user_name == NULL || dir_path == NULL) {
@@ -46,45 +45,39 @@ int main(int argc, char *argv[]) {
   }
   user_info = getpwnam(user_name);
   if (user_info == NULL) {
-    fprintf(stderr, "%s: invalid user name\n", exe_name);
+    FtpLog(LOG_ERROR, "%s: invalid user name\n", exe_name);
     exit(1);
   }
-
-  printf("ftp user user and dir check success.\n");
 
   /* change to root directory */
   if (chroot(dir_path) != 0) {
-    perror("chroot directory error");
+    FtpLog(LOG_ERROR, "chroot directory error");
     exit(1);
   }
   if (chdir("/") != 0) {
-    perror("change to root directory error");
+    FtpLog(LOG_ERROR, "change to root directory error");
     exit(1);
   }
-
-  printf("ftp root directory change success.\n");
 
   /* Avoids SIGPIPE on socket activity */
   signal(SIGPIPE, SIG_IGN);
 
-  printf("ftp signal pipe ignore success.\n");
-
   /* Creates the main listener */
   if (!FtpListenerInit(&ftp_listener, address, port,
                        max_clients, INACTIVITY_TIMEOUT)) {
-    perror("ftp listner init error.");
+    FtpLog(LOG_ERROR, "ftp listner init error.");
     exit(1);
   }
 
-  printf("ftp listener init success.\n");
+  FtpLog(LOG_INFO, "ftp listener init success.");
 
   /* Start the listener */
   if (FtpListenerStart(&ftp_listener) == 0) {
-    perror("ftp listener start error.");
+    FtpLog(LOG_ERROR, "ftp listener start error.");
     exit(1);
   }
 
-  printf("ftp server listening...\n");
+  FtpLog(LOG_INFO, "ftp server listening...");
 
   /* wait for a SIGTERM and exit gracefully */
   sigemptyset(&term_signal);
@@ -93,14 +86,15 @@ int main(int argc, char *argv[]) {
   pthread_sigmask(SIG_BLOCK, &term_signal, NULL);
   sigwait(&term_signal, &sig);
   if (sig == SIGTERM) {
-    printf("SIGTERM received, shutting down\n");
+    FtpLog(LOG_INFO, "SIGTERM received, shutting down\n");
   } else {
-    printf("SIGINT received, shutting down\n");
+    FtpLog(LOG_INFO, "SIGINT received, shutting down\n");
   }
 
   /* Stop the server */
   FtpListenerStop(&ftp_listener);
-  printf("all connections finished, FTP server exiting.\n");
+
+  FtpLog(LOG_INFO, "all connections finished, FTP server exiting.\n");
   exit(0);
 }
 

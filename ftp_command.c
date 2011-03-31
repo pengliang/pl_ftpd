@@ -18,15 +18,13 @@
 #define ARG_STRUCTURE         5
 #define ARG_MODE              6
 #define ARG_OFFSET            7
-#define ARG_HOST_PORT_LONG    8
-#define ARG_HOST_PORT_EXT     9
-#define ARG_OPTIONAL_NUMBER  10
 
 /* our FTP commands */
 struct {
   char *name;
   int arg_type;
 } command_def[] = {
+  { "AUTH", ARG_STRING          },
   { "USER", ARG_STRING          },
   { "PASS", ARG_STRING          },
   { "CWD",  ARG_STRING          },
@@ -69,7 +67,7 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
 
   /* see if our input starts with a valid command */
   match = -1;
-  for (i=0; (i < kCommandNum) && (match == -1); ++i) {
+  for (i = 0; (i < kCommandNum) && (match == -1); ++i) {
     len = strlen(command_def[i].name);
     if (strncasecmp(input, command_def[i].name, len) == 0) {
       match = i;
@@ -78,7 +76,7 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
 
   /* if we didn't find a match, return error */
   if (match == -1) {
-    return 0;
+    return COMMAND_UNRECOGNIZED;
   }
 
   assert(match >= 0);
@@ -97,7 +95,7 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
       break;
     case ARG_STRING:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       ++input;
       input = CopyLine(tmp.arg[0].string, input);
@@ -114,40 +112,19 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
       break;
     case ARG_HOST_PORT:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       /* parse the host & port information (if any) */
       input = ParseHostPort(&tmp.arg[0].host_port, input);
       if (input == NULL) {
-        return 0;
+        goto Parameter_Error;
       }
       tmp.num_arg = 1;
       break;
-    case ARG_OPTIONAL_NUMBER:
-      if (*input == ' ') {
-        ++input;
-        optional_number = ParseNumber(&tmp.arg[0].num, input, 255);
-        if (optional_number != NULL) {
-          input = optional_number;
-        } else {
-          if ((tolower(input[0]) == 'a') &&
-              (tolower(input[1]) == 'l') &&
-              (tolower(input[2]) == 'l')) {
-            tmp.arg[0].num = EPSV_ALL;
-            input += 3;
-          } else {
-            return 0;
-          }
-        }
-        tmp.num_arg = 1;
-      } else {
-        tmp.num_arg = 0;
-      }
-      break;
     case ARG_TYPE:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
 
@@ -160,7 +137,7 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
           input++;
           c = toupper(*input);
           if ((c != 'N') && (c != 'T') && (c != 'C')) {
-            return 0;
+            goto Parameter_Error;
           }
           tmp.arg[1].string[0] = c;
           tmp.arg[1].string[1] = '\0';
@@ -180,21 +157,21 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
         input++;
         input = ParseNumber(&tmp.arg[1].num, input, 255);
         if (input == NULL) {
-          return 0;
+          goto Parameter_Error;
         }
         tmp.num_arg = 2;
       } else {
-        return 0;
+        goto Parameter_Error;
       }
       break;
     case ARG_STRUCTURE:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       c = toupper(*input);
       if ((c != 'F') && (c != 'R') && (c != 'P')) {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       tmp.arg[0].string[0] = c;
@@ -203,12 +180,12 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
       break;
     case ARG_MODE:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       c = toupper(*input);
       if ((c != 'S') && (c != 'B') && (c != 'C')) {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       tmp.arg[0].string[0] = c;
@@ -217,25 +194,28 @@ int FtpCommandParse(const char *input, FtpCommand *cmd) {
       break;
     case ARG_OFFSET:
       if (*input != ' ') {
-        return 0;
+        goto Parameter_Error;
       }
       input++;
       input = ParseOffset(&tmp.arg[0].offset, input);
       if (input == NULL) {
-        return 0;
+        goto Parameter_Error;
       }
       tmp.num_arg = 1;
       break;
     default:
       assert(0);
   }
+
   /* check for our ending newline */
   if (*input != '\n') {
-    return 0;
+Parameter_Error:
+    return COMMAND_PARAMETERS_ERROR;
   }
+
   /* return our result */
   *cmd = tmp;
-  return 1;
+  return 0;
 }
 
 /* copy a string terminated with a newline */

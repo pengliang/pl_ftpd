@@ -18,9 +18,6 @@ int FtpLog(int code, const char *fmt, ...) {
   printf("%s: ", log_header[code]);
   vprintf(fmt, ap);
 
-  if (code == LOG_ERROR) {
-    perror(NULL);
-  }
   putchar('\n');
   va_end(ap);
 

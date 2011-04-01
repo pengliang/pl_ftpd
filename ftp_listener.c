@@ -155,7 +155,7 @@ static int SocketSetup(char *address, int port) {
   /* Creates socket */
   sock_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (sock_fd == -1) {
-    FtpLog(LOG_ERROR, "error: creating socket;");
+    FtpLog(LOG_ERROR, "error: creating socket; %s", strerror(errno));
     return -1;
   }
 
@@ -163,20 +163,20 @@ static int SocketSetup(char *address, int port) {
   if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR,
                  (void *)&reuseaddr, sizeof(int)) !=0) {
     close(sock_fd);
-    FtpLog(LOG_ERROR, "error setting socket to reuse address;");
+    FtpLog(LOG_ERROR, "error setting socket to reuse address; %s", strerror(errno));
     return -1;
   }
 
   if (bind(sock_fd, (struct sockaddr *)&sock_addr,
            sizeof(struct sockaddr_in)) != 0)  {
     close(sock_fd);
-    FtpLog(LOG_ERROR, "error binding address;");
+    FtpLog(LOG_ERROR, "error binding address; %s", strerror(errno));
     return -1;
   }
 
   if (listen(sock_fd, SOMAXCONN) != 0) {
     close(sock_fd);
-    FtpLog(LOG_ERROR, "error setting socket to listen;");
+    FtpLog(LOG_ERROR, "error setting socket to listen; %s", strerror(errno));
     return -1;
   }
 
@@ -184,12 +184,12 @@ static int SocketSetup(char *address, int port) {
   flags = fcntl(sock_fd, F_GETFL);
   if (flags == -1) {
     close(sock_fd);
-    FtpLog(LOG_ERROR, "error getting flags on socket;");
+    FtpLog(LOG_ERROR, "error getting flags on socket; %s", strerror(errno));
     return -1;
   }
   if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) != 0) {
     close(sock_fd);
-    FtpLog(LOG_ERROR, "error setting socket to non-blocking;");
+    FtpLog(LOG_ERROR, "error setting socket to non-blocking; %s", strerror(errno));
     return -1;
   }
 

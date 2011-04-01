@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "ftp_listener.h"
 #include "ftp_log.h"
@@ -32,6 +33,17 @@ int main(int argc, char *argv[]) {
   address = FTP_ADDRESS;
   max_clients = MAX_CLIENTS;
 
+  /* grab our executable name */
+  if (argc > 0) {
+    exe_name = argv[0];
+  }
+
+  /* verify we're running as root */
+  if (geteuid() != 0) {
+    fprintf(stderr, "%s: program needs root permission to run\n", exe_name);
+    exit(1);
+  }
+
   /* Gets user's args */
   if (GetOptions(argc, argv, &port, &address,
                  &max_clients, &user_name, &dir_path) == 0) {
@@ -45,17 +57,17 @@ int main(int argc, char *argv[]) {
   }
   user_info = getpwnam(user_name);
   if (user_info == NULL) {
-    FtpLog(LOG_ERROR, "%s: invalid user name\n", exe_name);
+    FtpLog(LOG_ERROR, "%s: invalid user name", exe_name);
     exit(1);
   }
 
   /* change to root directory */
   if (chroot(dir_path) != 0) {
-    FtpLog(LOG_ERROR, "chroot directory error");
+    FtpLog(LOG_ERROR, "chroot directory error", strerror(errno));
     exit(1);
   }
   if (chdir("/") != 0) {
-    FtpLog(LOG_ERROR, "change to root directory error");
+    FtpLog(LOG_ERROR, "change to root directory error; %s", strerror(errno));
     exit(1);
   }
 
@@ -70,6 +82,19 @@ int main(int argc, char *argv[]) {
   }
 
   FtpLog(LOG_INFO, "ftp listener init success.");
+
+  /* set user to be as inoffensive as possible */
+  if (setgid(user_info->pw_gid) != 0) {
+    FtpLog(LOG_ERROR, "error changing group; %s", strerror(errno));
+    exit(1);
+  }
+
+  if (setuid(user_info->pw_uid) != 0) {
+    FtpLog(LOG_ERROR, "error changing group; %s", strerror(errno));
+    exit(1);
+  }
+
+  FtpLog(LOG_INFO, "ftp running as gid: %d, uid: %d", user_info->pw_gid, user_info->pw_uid);
 
   /* Start the listener */
   if (FtpListenerStart(&ftp_listener) == 0) {

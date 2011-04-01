@@ -8,8 +8,10 @@
 #include "ftp_session.h"
 #include "ftp_command.h"
 #include "ftp_log.h"
+#include "file_list.h"
 
 static void ChangeDir(FtpSession *f, const char *new_dir);
+static int OpenDataConnection(FtpSession *f);
 
 void DoUser(FtpSession *f, const FtpCommand *cmd) {
   const char *user;
@@ -64,12 +66,60 @@ void DoPwd(FtpSession *f, const FtpCommand *cmd) {
 
 }
 
-void DoList(FtpSession *f, const FtpCommand *cmd) {
+static void SendFileList(FtpSession *f, const FtpCommand *cmd,
+                         int (*PrintFileListFunc)(int fd, const char *dir)) {
+  int fd;
+  char dir_path[PATH_MAX + 1];
+  int send_ok;
+
+  assert(f != NULL);
+  assert(cmd != NULL);
+  assert((cmd->num_arg == 0) || (cmd->num_arg == 1));
+
+  /* For exit */
+  fd = -1;
+
+  /* Figures out what parameters to use */
+  if (cmd->num_arg == 0) {
+    strcpy(dir_path, "./");
+  } else {
+    assert(cmd->num_arg == 1);
+    strcpy(dir_path, cmd->arg[0].string);
+  }
+
+  /* Ready to list */
+  FtpSessionReply(f, 150, "File status okay; about to open data connection.");
+
+  /* Opens data connection */
+  fd = OpenDataConnection(f);
+  if (fd == -1) {
+    FtpSessionReply(f, 425, "Can't open data connection");
+    goto exit;
+  }
+
+  FtpSessionReply(f, 125, "Data connection already open; transfer starting.");
+
+  send_ok = PrintFileListFunc(fd, dir_path);
+
+  if (send_ok) {
+    FtpSessionReply(f, 226, "Transfer complete.");
+  } else {
+    FtpSessionReply(f, 451, "Transfer aborted, local error in processing; %s", strerror(errno));
+  }
+
+exit:
+  if (fd != -1) {
+    close(fd);
+  }
 
 }
 
-void DoNlst(FtpSession *f, const FtpCommand *cmd) {
+void DoList(FtpSession *f, const FtpCommand *cmd) {
+  SendFileList(f, cmd, PrintFileFullList);
+}
 
+void DoNlst(FtpSession *f, const FtpCommand *cmd) {
+  SendFileList(f, cmd, PrintFileNameList);
 }
 
 void DoQuit(FtpSession *f, const FtpCommand *cmd){
@@ -82,10 +132,31 @@ void DoQuit(FtpSession *f, const FtpCommand *cmd){
 }
 
 void DoPort(FtpSession *f, const FtpCommand *cmd){
-  FtpSessionReply(f, 230, "User logged in, proceed.");
+  const struct sockaddr_in *host_port;
+
+  assert(f != NULL);
+  assert(cmd != NULL);
+  assert(cmd->num_arg == 1);
+
+  host_port = &cmd->arg[0].host_port;
+  assert(host_port->sin_family == AF_INET);
+
+  if (ntohs(host_port->sin_port) < IPPORT_RESERVED) {
+    FtpSessionReply(f, 500, "Port may not be less than 1024, which is reserved.");
+  } else {
+    /* close any outstanding PASSIVE port */
+    if (f->data_channel == DATA_PASSIVE) {
+      close(f->server_fd);
+      f->server_fd = -1;
+    }
+    f->data_channel = DATA_PORT;
+    f->data_port = *host_port;
+    FtpSessionReply(f, 200, "Command okay.");
+  }
 }
 
 void DoType(FtpSession *f, const FtpCommand *cmd){
+
   FtpSessionReply(f, 230, "User logged in, proceed.");
 }
 
@@ -142,11 +213,50 @@ static void ChangeDir(FtpSession *f, const char *new_dir) {
 
   /* if everything is okay, change into the directory */
   if (getcwd(dir, sizeof(dir)) == NULL) {
-    FtpLog(LOG_ERROR, "error getting current directory;");
+    FtpLog(LOG_ERROR, "error getting current directory; %s", strerror(errno));
     assert(chdir(f->dir) == 0);
-    FtpSessionReply(f, 550, "Directory change failed.");
+    FtpSessionReply(f, 550, "Directory change failed. %s", strerror(errno));
   } else {
     strcpy(f->dir, dir);
     FtpSessionReply(f, 250, "Directory change to %s successful.", f->dir);
   }
 }
+
+static int OpenDataConnection(FtpSession *f) {
+  int socket_fd;
+  struct sockaddr_in addr;
+  unsigned addr_len;
+
+  assert((f->data_channel == DATA_PORT) ||
+         (f->data_channel == DATA_PASSIVE));
+
+  if (f->data_channel == DATA_PORT) {
+    socket_fd = socket(f->data_port.sin_family, SOCK_STREAM, IPPROTO_TCP);
+    if (socket_fd == -1) {
+      FtpSessionReply(f, 425, "Error creating socket; %s.", strerror(errno));
+      return -1;
+    }
+    if (connect(socket_fd, (struct sockaddr *)&f->data_port,
+                sizeof(f->data_port)) != 0) {
+      FtpSessionReply(f, 425, "Error connecting; %s.", strerror(errno));
+	    close(socket_fd);
+	    return -1;
+    }
+  } else {
+    assert(f->data_channel == DATA_PASSIVE);
+    addr_len = sizeof(struct sockaddr_in);
+    socket_fd = accept(f->server_fd, (struct sockaddr *)&addr, &addr_len);
+    if (socket_fd == -1) {
+      FtpSessionReply(f, 425, "Error accepting connection; %s.", strerror(errno));
+      return -1;
+    }
+    if (memcmp(&f->client_addr.sin_addr, &addr.sin_addr, sizeof(struct in_addr)))	{
+      FtpSessionReply(f, 425, "Error accepting connection; connection from invalid IP.");
+      close(socket_fd);
+      return -1;
+    }
+  }
+
+  return socket_fd;
+}
+

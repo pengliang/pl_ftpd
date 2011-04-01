@@ -50,7 +50,6 @@ typedef struct {
   int data_channel;
   struct sockaddr_in data_port;
   int server_fd;
-
 } FtpSession;
 
 int FtpSessionInit(FtpSession *f, const struct sockaddr_in *client_addr,

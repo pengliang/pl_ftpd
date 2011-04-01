@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <arpa/ftp.h>
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
@@ -156,16 +157,78 @@ void DoPort(FtpSession *f, const FtpCommand *cmd){
 }
 
 void DoType(FtpSession *f, const FtpCommand *cmd){
+  char type;
+  char form;
+  int cmd_okay;
 
-  FtpSessionReply(f, 230, "User logged in, proceed.");
+  assert(f != NULL);
+  assert(cmd != NULL);
+  assert(cmd->num_arg >= 1);
+  assert(cmd->num_arg <= 2);
+
+  type = cmd->arg[0].string[0];
+  if (cmd->num_arg == 2) {
+    form = cmd->arg[1].string[0];
+  } else {
+    form = 0;
+  }
+
+  cmd_okay = 0;
+  if (type == 'A') {
+    if ((cmd->num_arg == 1) || ((cmd->num_arg == 2) && (form == 'N'))) {
+      f->data_type = TYPE_A;
+      cmd_okay = 1;
+    }
+  } else if (type == 'I') {
+    f->data_type = TYPE_I;
+    cmd_okay = 1;
+  }
+
+  if (cmd_okay) {
+    FtpSessionReply(f, 200, "Command okay.");
+  } else {
+    FtpSessionReply(f, 504, "Command not implemented for that parameter.");
+  }
 }
 
 void DoStru(FtpSession *f, const FtpCommand *cmd){
-  FtpSessionReply(f, 230, "User logged in, proceed.");
+  char structure;
+  int cmd_okay;
+
+  assert(f != NULL);
+  assert(cmd != NULL);
+  assert(cmd->num_arg == 1);
+
+  structure = cmd->arg[0].string[0];
+  cmd_okay = 0;
+  if (structure == 'F') {
+    f->file_structure = STRU_F;
+    cmd_okay = 1;
+  } else if (structure == 'R') {
+    f->file_structure = STRU_R;
+    cmd_okay = 1;
+  }
+
+  if (cmd_okay) {
+    FtpSessionReply(f, 200, "Command okay.");
+  } else {
+    FtpSessionReply(f, 504, "Command not implemented for that parameter.");
+  }
 }
 
 void DoMode(FtpSession *f, const FtpCommand *cmd){
-  FtpSessionReply(f, 230, "User logged in, proceed.");
+  char mode;
+
+  assert(f != NULL);
+  assert(cmd != NULL);
+  assert(cmd->num_arg == 1);
+
+  mode = cmd->arg[0].string[0];
+  if (mode == 'S') {
+    FtpSessionReply(f, 200, "Command okay.");
+  } else {
+    FtpSessionReply(f, 504, "Command not implemented for that parameter.");
+  }
 }
 
 void DoRetr(FtpSession *f, const FtpCommand *cmd){

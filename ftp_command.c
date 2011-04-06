@@ -19,7 +19,7 @@
 #define ARG_MODE              6
 #define ARG_OFFSET            7
 
-/* our FTP commands */
+/* FTP commands syntax define */
 struct {
   char *name;
   int arg_type;

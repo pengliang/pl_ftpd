@@ -2,6 +2,49 @@ This is a anonymous ftp server under development now.
 
 I copied many code from oftpd (http://www.time-travellers.org/oftpd/) project.
 
+Supported commands in RFC 959 now:
+
+USER <SP> <username> <CRLF>
+PASS <SP> <password> <CRLF>
+CWD <SP> <pathname> <CRLF>
+CDUP <CRLF>
+QUIT <CRLF>
+PORT <SP> <host-port> <CRLF>
+PASV <CRLF>
+TYPE <SP> <type-code> <CRLF>
+STRU <SP> <structure-code> <CRLF>
+MODE <SP> <mode-code> <CRLF>
+RETR <SP> <pathname> <CRLF>
+REST <SP> <marker> <CRLF>
+PWD <CRLF>
+LIST [<SP> <pathname>] <CRLF>
+NLST [<SP> <pathname>] <CRLF>
+SYST <CRLF>
+NOOP <CRLF>
+
+Supported commands in RFC 3659 now:
+
+MDTM <SP> <pathname> <CRLF>
+
+Unsupported Commands in RFC 959 now:
+
+ACCT <SP> <account-information> <CRLF>
+SMNT <SP> <pathname> <CRLF>
+REIN <CRLF>
+STOR <SP> <pathname> <CRLF>
+STOU <CRLF>
+APPE <SP> <pathname> <CRLF>
+ALLO <SP> <decimal-integer> [<SP> R <SP> <decimal-integer>] <CRLF>>
+RNFR <SP> <pathname> <CRLF>
+RNTO <SP> <pathname> <CRLF>
+ABOR <CRLF>
+DELE <SP> <pathname> <CRLF>
+RMD <SP> <pathname> <CRLF>
+MKD <SP> <pathname> <CRLF>
+SITE <SP> <string> <CRLF>
+STAT [<SP> <pathname>] <CRLF>
+HELP [<SP> <string>] <CRLF>
+
 =========
 PengLiang (pengliang.sdu@gmail.com)
 

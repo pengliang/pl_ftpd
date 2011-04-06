@@ -20,6 +20,8 @@ void DoMode(FtpSession *f, const FtpCommand *cmd);
 void DoRetr(FtpSession *f, const FtpCommand *cmd);
 void DoStor(FtpSession *f, const FtpCommand *cmd);
 void DoNoop(FtpSession *f, const FtpCommand *cmd);
-
+void DoRest(FtpSession *f, const FtpCommand *cmd);
+void DoPasv(FtpSession *f, const FtpCommand *cmd);
+void DoMdtm(FtpSession *f, const FtpCommand *cmd);
 
 #endif /* FTP_COMMAND_HANDLER_H */

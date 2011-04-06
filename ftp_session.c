@@ -16,6 +16,7 @@
 #include "telnet_session.h"
 #include "ftp_command.h"
 #include "ftp_command_handler.h"
+#include "ftp_log.h"
 
 struct {
   char *name;
@@ -25,17 +26,20 @@ struct {
   { "pass", DoPass  },
   { "cwd",  DoCwd   },
   { "cdup", DoCdup  },
-  { "pwd",  DoPwd   },
-  { "list", DoList  },
-  { "nlst", DoNlst  },
   { "quit", DoQuit  },
-  { "port", DoPort  },
-  { "type", DoType  },
-  { "stru", DoStru  },
-  { "mode", DoMode  },
+  { "pwd",  DoPwd   },
   { "retr", DoRetr  },
   { "stor", DoStor  },
   { "noop", DoNoop  },
+  { "list", DoList  },
+  { "nlst", DoNlst  },
+  { "rest", DoRest  },
+  { "mdtm", DoMdtm  },
+  { "port", DoPort  },
+  { "pasv", DoPasv  },
+  { "type", DoType  },
+  { "stru", DoStru  },
+  { "mode", DoMode  },
 };
 
 static const int kCommandFuncNum = sizeof(command_func) / sizeof(command_func[0]);
@@ -151,6 +155,8 @@ void FtpSessionRun(FtpSession *f) {
       }
       goto next_command;
     }
+
+    FtpLog(LOG_INFO, "%s", cmd.command);
 
     /* dispatch the command */
     for (i = 0; i < kCommandFuncNum; i++) {

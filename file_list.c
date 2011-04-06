@@ -176,17 +176,11 @@ static void fdprintf(int fd, const char *fmt, ...) {
   }
 }
 
-static int GetFileList(const char *dir_name, FileInfo **file_info_list, int *num_files) {
+static int GetFileList(const char *full_path, FileInfo **file_info_list, int *num_files) {
   int n = 0, i = 0;
   struct dirent **file_list;
   FileInfo *file_info = NULL;
-  char full_path[PATH_MAX + 1];
   struct stat file_stat;
-
-  memset(full_path, 0, sizeof(full_path));
-  if (!GetAbsolutePath(full_path, sizeof(full_path), dir_name)) {
-    return 0;
-  }
 
   if (stat(full_path, &file_stat) == -1) {
     return 0;
@@ -236,6 +230,7 @@ static int GetFileList(const char *dir_name, FileInfo **file_info_list, int *num
   return 1;
 }
 
+/*
 static int GetAbsolutePath(char *abs_path, int abs_len, const char *rel_path) {
   const char *p;
   char *prev_dir, *path_end, *n;
@@ -249,7 +244,7 @@ static int GetAbsolutePath(char *abs_path, int abs_len, const char *rel_path) {
   p = rel_path;
 
   if (*p == '/') {
-    /* if this starts with a '/' it is an absolute path */
+    // if this starts with a '/' it is an absolute path
     strcpy(abs_path, "/");
     do {
       p++;
@@ -260,22 +255,22 @@ static int GetAbsolutePath(char *abs_path, int abs_len, const char *rel_path) {
     return 1;
   }
 
-  /* otherwise it's a relative path */
+  // otherwise it's a relative path
   assert(getcwd(cur_path, sizeof(cur_path)) != 0);
   assert(strlen(cur_path) < (size_t)abs_len);
   strcpy(abs_path, cur_path);
 
-  /* append on each directory in relative path, handling "." and ".." */
+  // append on each directory in relative path, handling "." and ".."
   while (*p != '\0') {
-    /* find the end of the next directory (either at '/' or '\0') */
+    // find the end of the next directory (either at '/' or '\0')
     if ((n = strchr(p, '/')) == NULL) {
       n = strchr(p, '\0');
     }
     len = n - p;
     if ((len == 1) && (p[0] == '.')) {
-      /* do nothing with "." */
+      // do nothing with "."
     } else if ((len == 2) && (p[0] == '.') && (p[1] == '.')) {
-      /* change to previous directory with ".." */
+      // change to previous directory with ".."
       prev_dir = strrchr(abs_path, '/');
       assert(prev_dir != NULL);
       *prev_dir = '\0';
@@ -283,24 +278,24 @@ static int GetAbsolutePath(char *abs_path, int abs_len, const char *rel_path) {
         strcpy(abs_path, "/");
       }
     } else {
-      /* otherwise add to current directory */
+      // otherwise add to current directory
       if ((strlen(abs_path) + 1 + len) > PATH_MAX) {
         return 0;
       }
-      /* append a '/' unless we were at the root directory */
+      // append a '/' unless we were at the root directory
       path_end = strchr(abs_path, '\0');
       if (path_end != abs_path + 1) {
         *path_end++ = '/';
       }
-      /* add the directory itself */
+      // add the directory itself
       while (p != n) {
         *path_end++ = *p++;
       }
       *path_end = '\0';
     }
-    /* advance to next directory to check */
+    // advance to next directory to check
     p = n;
-    /* skip '/' characters */
+    // skip '/' characters
     while (*p == '/') {
       p++;
     }
@@ -308,3 +303,4 @@ static int GetAbsolutePath(char *abs_path, int abs_len, const char *rel_path) {
 
   return 1;
 }
+*/
